@@ -1,0 +1,1504 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard de Crescimento Populacional Municipal</title>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <style>
+    /* Estilos adicionais e suporte a temas */
+    :root {
+      --bg: #0f172a;
+      --card-bg: #1e293b;
+      --border-color: #334155;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --primary-color: #3b82f6;
+      --accent-color: #10b981;
+      --danger-color: #ef4444;
+      --warning-color: #f59e0b;
+    }
+
+    body {
+      background-color: var(--background, #0b0f19);
+      color: var(--foreground, #f1f5f9);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    }
+
+    .card {
+      background-color: var(--card, #131b2e);
+      border: 1px solid var(--border, #232f48);
+    }
+
+    .subcard {
+      background-color: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.07);
+    }
+
+    .chart-tooltip {
+      position: absolute;
+      pointer-events: none;
+      transition: opacity 0.15s ease;
+      z-index: 50;
+    }
+
+    /* Custom scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(0, 0, 0, 0.1);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #334155;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body class="p-4 md:p-8 min-h-screen">
+
+  <div class="max-w-7xl mx-auto space-y-6">
+
+    <!-- CABEÇALHO DO DASHBOARD -->
+    <header class="card rounded-2xl p-6 shadow-xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+      <div>
+        <div class="flex items-center gap-2 mb-1">
+          <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-500/10 text-blue-400 border border-blue-500/20">
+            Demografia & Estatística Espacial
+          </span>
+          <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+            Análise Multirregional
+          </span>
+        </div>
+        <h1 class="text-2xl md:text-3xl font-bold tracking-tight text-white flex items-center gap-2">
+          Crescimento Populacional Absoluto dos Municípios
+        </h1>
+        <p class="text-sm text-slate-400 mt-1 max-w-3xl">
+          Avaliação do ritmo de expansão anual dos municípios brasileiros: cálculo e interpretação comparativa de 
+          <strong>médias</strong>, <strong>medianas</strong> e <strong>desvios padrão</strong> das taxas de crescimento entre macrorregiões.
+        </p>
+      </div>
+
+      <!-- Ações rápidas de exportação e reset -->
+      <div class="flex items-center gap-3">
+        <button id="btnResetFilters" class="text-xs px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition">
+          ↺ Resetar Filtros
+        </button>
+        <div class="text-right hidden sm:block">
+          <div class="text-xs text-slate-400">Escopo Amostral</div>
+          <div class="text-sm font-semibold text-slate-200" id="headerSampleCount">300 Municípios Polo</div>
+        </div>
+      </div>
+    </header>
+
+    <!-- BARRA DE CONTROLE E FILTROS DINÂMICOS -->
+    <section class="card rounded-2xl p-5 shadow-lg space-y-4">
+      <div class="flex flex-col lg:flex-row gap-4 justify-between items-start lg:items-center">
+        
+        <!-- Filtro por Região -->
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="text-xs font-bold uppercase tracking-wider text-slate-400 mr-1">Região:</span>
+          <button data-region="ALL" class="filter-reg-btn text-xs px-3.5 py-1.5 rounded-lg font-medium transition bg-blue-600 text-white shadow-sm">
+            Todas as Regiões
+          </button>
+          <button data-region="Norte" class="filter-reg-btn text-xs px-3.5 py-1.5 rounded-lg font-medium transition bg-slate-800 text-slate-300 hover:bg-slate-700">
+            Norte
+          </button>
+          <button data-region="Nordeste" class="filter-reg-btn text-xs px-3.5 py-1.5 rounded-lg font-medium transition bg-slate-800 text-slate-300 hover:bg-slate-700">
+            Nordeste
+          </button>
+          <button data-region="Centro-Oeste" class="filter-reg-btn text-xs px-3.5 py-1.5 rounded-lg font-medium transition bg-slate-800 text-slate-300 hover:bg-slate-700">
+            Centro-Oeste
+          </button>
+          <button data-region="Sudeste" class="filter-reg-btn text-xs px-3.5 py-1.5 rounded-lg font-medium transition bg-slate-800 text-slate-300 hover:bg-slate-700">
+            Sudeste
+          </button>
+          <button data-region="Sul" class="filter-reg-btn text-xs px-3.5 py-1.5 rounded-lg font-medium transition bg-slate-800 text-slate-300 hover:bg-slate-700">
+            Sul
+          </button>
+        </div>
+
+        <!-- Filtro por Faixa Populacional e Busca -->
+        <div class="flex flex-wrap items-center gap-3 w-full lg:w-auto">
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-bold uppercase tracking-wider text-slate-400">Porte:</span>
+            <select id="selectPorte" class="text-xs bg-slate-800 text-slate-200 border border-slate-700 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500">
+              <option value="ALL">Todos os Portes</option>
+              <option value="PEQUENO">Pequeno Porte (&lt; 20k hab)</option>
+              <option value="MEDIO_PEQ">Médio-Pequeno (20k a 50k hab)</option>
+              <option value="MEDIO">Médio Porte (50k a 150k hab)</option>
+              <option value="GRANDE">Grande Porte (&gt; 150k hab)</option>
+            </select>
+          </div>
+
+          <div class="relative flex-1 sm:w-56">
+            <input type="text" id="inputSearch" placeholder="Buscar município ou UF..." 
+              class="w-full text-xs bg-slate-800 text-slate-200 border border-slate-700 rounded-lg pl-8 pr-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500">
+            <svg class="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+            </svg>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- CARDS DE ESTATÍSTICAS CHAVE (KPIs DINÂMICOS) -->
+    <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+      
+      <!-- Card Média -->
+      <div class="card rounded-xl p-4 shadow border-l-4 border-l-blue-500 relative overflow-hidden">
+        <div class="text-xs font-medium text-slate-400 uppercase tracking-wider">Média da Taxa Anual</div>
+        <div class="flex items-baseline gap-2 mt-2">
+          <span class="text-2xl font-bold text-white" id="kpiMedia">0.00%</span>
+          <span class="text-xs text-slate-400">a.a.</span>
+        </div>
+        <div class="text-[11px] text-slate-400 mt-2 flex items-center justify-between">
+          <span>Média aritmética</span>
+          <span id="kpiMediaBadge" class="text-blue-400 font-medium">Sensível a extremos</span>
+        </div>
+      </div>
+
+      <!-- Card Mediana -->
+      <div class="card rounded-xl p-4 shadow border-l-4 border-l-emerald-500 relative overflow-hidden">
+        <div class="text-xs font-medium text-slate-400 uppercase tracking-wider">Mediana da Taxa Anual</div>
+        <div class="flex items-baseline gap-2 mt-2">
+          <span class="text-2xl font-bold text-white" id="kpiMediana">0.00%</span>
+          <span class="text-xs text-slate-400">a.a.</span>
+        </div>
+        <div class="text-[11px] text-slate-400 mt-2 flex items-center justify-between">
+          <span>Município Típico</span>
+          <span id="kpiMedianaBadge" class="text-emerald-400 font-medium">Resistente a outliers</span>
+        </div>
+      </div>
+
+      <!-- Card Desvio Padrão -->
+      <div class="card rounded-xl p-4 shadow border-l-4 border-l-purple-500 relative overflow-hidden">
+        <div class="text-xs font-medium text-slate-400 uppercase tracking-wider">Desvio Padrão (&sigma;)</div>
+        <div class="flex items-baseline gap-2 mt-2">
+          <span class="text-2xl font-bold text-white" id="kpiDesvio">0.00%</span>
+          <span class="text-xs text-slate-400">p.p.</span>
+        </div>
+        <div class="text-[11px] text-slate-400 mt-2 flex items-center justify-between">
+          <span>Coef. Variação: <strong id="kpiCV" class="text-purple-300">0%</strong></span>
+          <span class="text-slate-400">Grau de dispersão</span>
+        </div>
+      </div>
+
+      <!-- Card Ganho Absoluto Total -->
+      <div class="card rounded-xl p-4 shadow border-l-4 border-l-amber-500 relative overflow-hidden">
+        <div class="text-xs font-medium text-slate-400 uppercase tracking-wider">Crescimento Absoluto Anual</div>
+        <div class="flex items-baseline gap-2 mt-2">
+          <span class="text-2xl font-bold text-white" id="kpiAbsoluto">+0</span>
+          <span class="text-xs text-slate-400">hab/ano</span>
+        </div>
+        <div class="text-[11px] text-slate-400 mt-2 flex items-center justify-between">
+          <span>Pop. Base: <span id="kpiPopBase">0 hab</span></span>
+          <span class="text-amber-400 font-medium">Volume real</span>
+        </div>
+      </div>
+
+      <!-- Card Comportamento / Assimetria -->
+      <div class="card rounded-xl p-4 shadow border-l-4 border-l-rose-500 relative overflow-hidden">
+        <div class="text-xs font-medium text-slate-400 uppercase tracking-wider">Assimetria / Tendência</div>
+        <div class="mt-2">
+          <span class="text-base font-bold text-white block leading-tight" id="kpiAssimetriaTitulo">Assimetria Positiva</span>
+          <span class="text-xs text-rose-300 font-medium" id="kpiAssimetriaDesc">Média &gt; Mediana</span>
+        </div>
+        <div class="text-[11px] text-slate-400 mt-2 flex items-center justify-between">
+          <span id="kpiDeclinioCount">0 em declínio</span>
+          <span id="kpiBoomCount">0 em boom</span>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- PAINEL DE ANÁLISE VISUAL PRINCIPAL (GRÁFICOS EM SVG RESPONSIVO) -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+      <!-- GRÁFICO 1: COMPARATIVO REGIONAL (MÉDIA vs MEDIANA vs DESVIO PADRÃO) -->
+      <div class="card rounded-2xl p-5 shadow-lg lg:col-span-7 flex flex-col justify-between">
+        <div class="flex items-start justify-between mb-4">
+          <div>
+            <h2 class="text-base font-bold text-white flex items-center gap-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-blue-500"></span>
+              Comparativo Regional: Médias, Medianas e Dispersão (&plusmn;1&sigma;)
+            </h2>
+            <p class="text-xs text-slate-400 mt-0.5">
+              Barras agrupadas exibem Média (Azul) e Mediana (Verde). As linhas de erro indicam a amplitude do Desvio Padrão.
+            </p>
+          </div>
+          <div class="flex items-center gap-3 text-xs text-slate-300">
+            <span class="flex items-center gap-1.5"><span class="w-3 h-3 bg-blue-500 rounded-sm inline-block"></span> Média</span>
+            <span class="flex items-center gap-1.5"><span class="w-3 h-3 bg-emerald-500 rounded-sm inline-block"></span> Mediana</span>
+            <span class="flex items-center gap-1.5"><span class="w-2.5 h-0.5 bg-rose-400 inline-block"></span> &plusmn; Desvio</span>
+          </div>
+        </div>
+
+        <!-- SVG Container do Gráfico de Barras Regional -->
+        <div class="relative w-full h-72 sm:h-80 bg-slate-900/60 rounded-xl p-3 border border-slate-800/80 flex items-center justify-center">
+          <svg id="svgRegionalBars" class="w-full h-full" viewBox="0 0 650 320" preserveAspectRatio="xMidYMid meet"></svg>
+          <div id="tooltipRegional" class="chart-tooltip hidden bg-slate-950/95 text-slate-100 border border-slate-700 text-xs rounded-lg p-2.5 shadow-2xl"></div>
+        </div>
+
+        <div class="mt-3 text-xs text-slate-400 bg-slate-800/40 p-2.5 rounded-lg border border-slate-800/60 flex items-center gap-2">
+          <svg class="w-4 h-4 text-amber-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
+          <span>
+            <strong>Leitura Crítica:</strong> Quanto maior a distância entre a Média e a Mediana, maior a concentração do crescimento em poucos municípios polos. Quanto maior a barra de erro vermelha, maior a heterogeneidade intra-regional.
+          </span>
+        </div>
+      </div>
+
+      <!-- GRÁFICO 2: CURVA DE DISTRIBUIÇÃO E ASSIMETRIA (HISTOGRAMA DE DENSIDADE) -->
+      <div class="card rounded-2xl p-5 shadow-lg lg:col-span-5 flex flex-col justify-between">
+        <div class="mb-4">
+          <h2 class="text-base font-bold text-white flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-purple-500"></span>
+            Distribuição de Frequência das Taxas (% a.a.)
+          </h2>
+          <p class="text-xs text-slate-400 mt-0.5">
+            Histograma dos municípios selecionados com marcação das linhas de Mediana e Média.
+          </p>
+        </div>
+
+        <!-- SVG Container do Histograma -->
+        <div class="relative w-full h-72 sm:h-80 bg-slate-900/60 rounded-xl p-3 border border-slate-800/80 flex items-center justify-center">
+          <svg id="svgDistribution" class="w-full h-full" viewBox="0 0 450 320" preserveAspectRatio="xMidYMid meet"></svg>
+          <div id="tooltipDist" class="chart-tooltip hidden bg-slate-950/95 text-slate-100 border border-slate-700 text-xs rounded-lg p-2.5 shadow-2xl"></div>
+        </div>
+
+        <div class="mt-3 flex items-center justify-between text-xs text-slate-400">
+          <div class="flex items-center gap-1.5">
+            <span class="w-2.5 h-0.5 bg-emerald-400 inline-block"></span> Linha Mediana (P50)
+          </div>
+          <div class="flex items-center gap-1.5">
+            <span class="w-2.5 h-0.5 bg-blue-400 inline-block"></span> Linha Média (&mu;)
+          </div>
+          <div class="text-slate-500">
+            N = <span id="distSampleSize">0</span> municípios
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- SEGUNDA LINHA VISUAL: DISPERSÃO DO RITMO ABSOLUTO (HAB/ANO) VS TAXA PERCENTUAL -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+      <!-- GRÁFICO 3: QUADRANTES DE EXPANSÃO (SCATTER PLOT) -->
+      <div class="card rounded-2xl p-5 shadow-lg lg:col-span-7 flex flex-col justify-between">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+          <div>
+            <h2 class="text-base font-bold text-white flex items-center gap-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
+              Matriz de Ritmo: Taxa Anual (%) vs Ganho Absoluto (+Hab/ano)
+            </h2>
+            <p class="text-xs text-slate-400 mt-0.5">
+              Cada ponto é um município. Identifique os polos de grande tração populacional versus cidades com rápido ritmo relativo.
+            </p>
+          </div>
+          <span class="text-xs bg-slate-800 text-slate-300 px-2.5 py-1 rounded border border-slate-700 self-start sm:self-auto">
+            Destaque de Outliers
+          </span>
+        </div>
+
+        <!-- SVG Container do Gráfico de Dispersão -->
+        <div class="relative w-full h-80 sm:h-96 bg-slate-900/60 rounded-xl p-3 border border-slate-800/80">
+          <svg id="svgScatter" class="w-full h-full" viewBox="0 0 650 360" preserveAspectRatio="xMidYMid meet"></svg>
+          <div id="tooltipScatter" class="chart-tooltip hidden bg-slate-950/95 text-slate-100 border border-slate-700 text-xs rounded-lg p-2.5 shadow-2xl"></div>
+        </div>
+
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-3 text-[11px] text-slate-400">
+          <div class="subcard p-2 rounded border border-slate-800 text-center">
+            <span class="block text-emerald-400 font-bold">Q1: Super Polos</span>
+            Alta Taxa & Alto Ganho Absoluto
+          </div>
+          <div class="subcard p-2 rounded border border-slate-800 text-center">
+            <span class="block text-blue-400 font-bold">Q2: Tração Metropol.</span>
+            Taxa Moderada & Alto Ganho
+          </div>
+          <div class="subcard p-2 rounded border border-slate-800 text-center">
+            <span class="block text-amber-400 font-bold">Q3: Expansão Relativa</span>
+            Alta Taxa em Cidades Médias/Peq.
+          </div>
+          <div class="subcard p-2 rounded border border-slate-800 text-center">
+            <span class="block text-rose-400 font-bold">Q4: Esvaziamento</span>
+            Taxa Negativa ou Próxima a Zero
+          </div>
+        </div>
+      </div>
+
+      <!-- GUIA DE INTERPRETAÇÃO ESTATÍSTICA APROFUNDADA -->
+      <div class="card rounded-2xl p-5 shadow-lg lg:col-span-5 flex flex-col justify-between">
+        <div>
+          <h2 class="text-base font-bold text-white flex items-center gap-2 mb-3">
+            <svg class="w-5 h-5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+            </svg>
+            Interpretação Estatística & Diagnóstico Regional
+          </h2>
+
+          <div class="space-y-3.5 text-xs text-slate-300 leading-relaxed">
+            
+            <div class="p-3 rounded-xl bg-blue-950/30 border border-blue-900/40">
+              <div class="font-bold text-blue-300 flex items-center gap-1.5 mb-1">
+                <span>1. O Dilema Média vs. Mediana em Demografia</span>
+              </div>
+              <p class="text-slate-300 text-[11.5px]">
+                Em dados municipais, a distribuição do crescimento quase sempre possui <strong>assimetria à direita (positiva)</strong>. Municípios que vivenciam <em>booms</em> (polos do agronegócio, centros de mineração ou eixos logísticos) inflam a <strong>média</strong> para cima. A <strong>mediana</strong> separa os 50% municípios mais lentos dos 50% mais rápidos, representando o comportamento real do "município típico".
+              </p>
+            </div>
+
+            <div class="p-3 rounded-xl bg-purple-950/30 border border-purple-900/40">
+              <div class="font-bold text-purple-300 flex items-center gap-1.5 mb-1">
+                <span>2. O Papel Crucial do Desvio Padrão (&sigma;)</span>
+              </div>
+              <p class="text-slate-300 text-[11.5px]">
+                Um desvio padrão elevado (como observado no <strong>Centro-Oeste</strong> e no <strong>Sudeste</strong>) denota <strong>forte heterogeneidade socioespacial</strong>: municípios convivendo lado a lado com intensas migrações atrativas enquanto cidades agrícolas tradicionais perdem população. Já no <strong>Sul</strong>, um desvio menor reflete homogeneidade de transição demográfica e fecundidade reduzida.
+              </p>
+            </div>
+
+            <div class="p-3 rounded-xl bg-amber-950/30 border border-amber-900/40">
+              <div class="font-bold text-amber-300 flex items-center gap-1.5 mb-1">
+                <span>3. Ritmo Relativo (%) versus Volume Absoluto (Hab/ano)</span>
+              </div>
+              <p class="text-slate-300 text-[11.5px]">
+                Um município de 15.000 habitantes crescendo a <strong>4,0% a.a.</strong> incorpora <strong>+600 pessoas/ano</strong>. Por outro lado, uma metrópole de 1.500.000 habitantes expandindo-se a módicos <strong>0,7% a.a.</strong> demanda infraestrutura para mais de <strong>+10.500 pessoas/ano</strong>. Ambos os ângulos são vitais para o planejamento de políticas públicas.
+              </p>
+            </div>
+
+          </div>
+        </div>
+
+        <div class="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between text-xs">
+          <span class="text-slate-400">Região em Foco: <strong id="interpretRegionName" class="text-white">Todas</strong></span>
+          <span class="text-indigo-400 font-semibold cursor-pointer hover:underline" id="btnToggleSimulador">Abrir Simulador de Projeção &darr;</span>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- SEÇÃO DO SIMULADOR PROJETIVO DE RITMO POPULACIONAL -->
+    <section id="sectionSimulador" class="card rounded-2xl p-5 shadow-lg border border-indigo-900/50">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+        <div>
+          <h2 class="text-base font-bold text-white flex items-center gap-2">
+            <span class="text-indigo-400 text-lg">&bull;</span>
+            Simulador de Impacto Populacional: Projeção por Cenários de Ritmo
+          </h2>
+          <p class="text-xs text-slate-400 mt-0.5">
+            Compare o impacto de projetar um município usando a <strong>Média</strong>, a <strong>Mediana</strong> regional ou uma taxa arbitrária.
+          </p>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="text-xs text-slate-400">Horizonte:</span>
+          <select id="simAnos" class="text-xs bg-slate-800 text-slate-200 border border-slate-700 rounded-lg px-2.5 py-1.5">
+            <option value="5">5 Anos</option>
+            <option value="10" selected>10 Anos</option>
+            <option value="15">15 Anos</option>
+            <option value="20">20 Anos</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-center">
+        <!-- Input População Base -->
+        <div class="subcard p-3 rounded-xl border border-slate-800">
+          <label class="block text-xs font-semibold text-slate-400 mb-1">População Inicial (Habitantes)</label>
+          <input type="number" id="simPopInicial" value="85000" step="5000" min="1000" 
+            class="w-full text-sm font-bold bg-slate-900 text-white border border-slate-700 rounded-lg px-3 py-1.5 focus:ring-1 focus:ring-indigo-500">
+        </div>
+
+        <!-- Cenário 1: Pela Mediana Regional -->
+        <div class="subcard p-3 rounded-xl border border-emerald-900/40 bg-emerald-950/20">
+          <div class="text-xs font-semibold text-emerald-400 mb-1 flex justify-between">
+            <span>Cenário Mediana (<span id="simTaxaMediana">0%</span>)</span>
+            <span class="text-[10px] text-emerald-500">Típico</span>
+          </div>
+          <div class="text-lg font-bold text-white" id="simResultMediana">0 hab</div>
+          <div class="text-[11px] text-emerald-300 font-medium" id="simGanhoMediana">+0 hab no total</div>
+        </div>
+
+        <!-- Cenário 2: Pela Média Regional -->
+        <div class="subcard p-3 rounded-xl border border-blue-900/40 bg-blue-950/20">
+          <div class="text-xs font-semibold text-blue-400 mb-1 flex justify-between">
+            <span>Cenário Média (<span id="simTaxaMedia">0%</span>)</span>
+            <span class="text-[10px] text-blue-500">Inflado</span>
+          </div>
+          <div class="text-lg font-bold text-white" id="simResultMedia">0 hab</div>
+          <div class="text-[11px] text-blue-300 font-medium" id="simGanhoMedia">+0 hab no total</div>
+        </div>
+
+        <!-- Cenário 3: Divergência entre Média e Mediana -->
+        <div class="subcard p-3 rounded-xl border border-purple-900/40 bg-purple-950/20">
+          <div class="text-xs font-semibold text-purple-400 mb-1 flex justify-between">
+            <span>Viés Projetivo (Delta)</span>
+            <span class="text-[10px] text-purple-500">Sobre-estimativa</span>
+          </div>
+          <div class="text-lg font-bold text-white" id="simDelta">0 hab</div>
+          <div class="text-[11px] text-purple-300" id="simDeltaDesc">Erro ao usar a média</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TABELA COMPLETA DE DADOS COM ORDENAÇÃO E STATUS -->
+    <section class="card rounded-2xl p-5 shadow-lg space-y-4">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <h2 class="text-base font-bold text-white flex items-center gap-2">
+            <span>Listagem Amostral de Municípios por Ritmo de Expansão</span>
+          </h2>
+          <p class="text-xs text-slate-400 mt-0.5">
+            Dados filtrados: <strong id="tableFilteredCount" class="text-slate-200">0</strong> municípios em exibição.
+          </p>
+        </div>
+
+        <!-- Ordenação -->
+        <div class="flex items-center gap-2">
+          <span class="text-xs text-slate-400">Ordenar por:</span>
+          <select id="selectSort" class="text-xs bg-slate-800 text-slate-200 border border-slate-700 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500">
+            <option value="taxa_desc">Maior Taxa Anual (% a.a.)</option>
+            <option value="taxa_asc">Menor Taxa / Maior Declínio</option>
+            <option value="abs_desc">Maior Ganho Absoluto (+Hab/ano)</option>
+            <option value="pop_desc">Maior População</option>
+            <option value="nome_asc">Nome do Município (A-Z)</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Tabela com rolagem -->
+      <div class="overflow-x-auto rounded-xl border border-slate-800">
+        <table class="w-full text-left text-xs">
+          <thead class="bg-slate-900/90 text-slate-400 uppercase tracking-wider font-semibold border-b border-slate-800">
+            <tr>
+              <th class="py-3 px-3.5">Município / UF</th>
+              <th class="py-3 px-3">Região</th>
+              <th class="py-3 px-3 text-right">População Base</th>
+              <th class="py-3 px-3 text-right">Ritmo Anual (% a.a.)</th>
+              <th class="py-3 px-3 text-right">Ganho Anual (+Hab/ano)</th>
+              <th class="py-3 px-3 text-right">Desvio em Relação à Média Reg.</th>
+              <th class="py-3 px-3.5 text-center">Classificação Demográfica</th>
+            </tr>
+          </thead>
+          <tbody id="tableBody" class="divide-y divide-slate-800/60 font-medium text-slate-300">
+            <!-- Linhas inseridas dinamicamente pelo JavaScript -->
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Paginação simples -->
+      <div class="flex items-center justify-between text-xs text-slate-400 pt-2">
+        <div id="tablePaginationInfo">Exibindo página 1 de 1</div>
+        <div class="flex items-center gap-2">
+          <button id="btnPrevPage" class="px-3 py-1 rounded bg-slate-800 text-slate-300 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed">Anterior</button>
+          <button id="btnNextPage" class="px-3 py-1 rounded bg-slate-800 text-slate-300 hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed">Próxima</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- RODAPÉ TÉCNICO -->
+    <footer class="text-center text-xs text-slate-500 py-4 space-y-1">
+      <p>Dashboard Demográfico Desenvolvido para Análise Espacial &bull; Foco em Ritmo Anual, Dispersão (&sigma;) e Centralidade</p>
+      <p>Metodologia de taxas calculadas pelo modelo exponencial geométrico anualizado \( r = \ln(P_t/P_0) / t \).</p>
+    </footer>
+
+  </div>
+
+  <!-- SCRIPT DE DADOS E LÓGICA ESTATÍSTICA -->
+  <script>
+    // --- 1. BANCO DE DADOS REALISTA DE MUNICÍPIOS POR MACRORREGIÃO ---
+    // Representando a rica heterogeneidade brasileira: capitais, polos do agronegócio, cidades mineradoras,
+    // municípios do semiárido, polos industriais e pequenos municípios do interior.
+    const MUNICIPALITIES_DATA = [
+      // CENTRO-OESTE (Alto crescimento decorrente do agronegócio, forte dispersão)
+      { nome: "Lucas do Rio Verde", uf: "MT", regiao: "Centro-Oeste", pop: 83798, taxa: 4.85 },
+      { nome: "Sinop", uf: "MT", regiao: "Centro-Oeste", pop: 196094, taxa: 4.62 },
+      { nome: "Sorriso", uf: "MT", regiao: "Centro-Oeste", pop: 110635, taxa: 4.28 },
+      { nome: "Rio Verde", uf: "GO", regiao: "Centro-Oeste", pop: 225696, taxa: 2.35 },
+      { nome: "Senador Canedo", uf: "GO", regiao: "Centro-Oeste", pop: 155635, taxa: 5.12 },
+      { nome: "Goiânia", uf: "GO", regiao: "Centro-Oeste", pop: 1437237, taxa: 0.98 },
+      { nome: "Aparecida de Goiânia", uf: "GO", regiao: "Centro-Oeste", pop: 527550, taxa: 1.54 },
+      { nome: "Brasília", uf: "DF", regiao: "Centro-Oeste", pop: 2817068, taxa: 0.84 },
+      { nome: "Valparaíso de Goiás", uf: "GO", regiao: "Centro-Oeste", pop: 198861, taxa: 3.65 },
+      { nome: "Águas Lindas de Goiás", uf: "GO", regiao: "Centro-Oeste", pop: 225671, taxa: 3.10 },
+      { nome: "Campo Grande", uf: "MS", regiao: "Centro-Oeste", pop: 897938, taxa: 1.15 },
+      { nome: "Dourados", uf: "MS", regiao: "Centro-Oeste", pop: 243368, taxa: 1.82 },
+      { nome: "Três Lagoas", uf: "MS", regiao: "Centro-Oeste", pop: 132152, taxa: 2.45 },
+      { nome: "Cuiabá", uf: "MT", regiao: "Centro-Oeste", pop: 650912, taxa: 1.45 },
+      { nome: "Várzea Grande", uf: "MT", regiao: "Centro-Oeste", pop: 299472, taxa: 1.62 },
+      { nome: "Rondonópolis", uf: "MT", regiao: "Centro-Oeste", pop: 244897, taxa: 2.15 },
+      { nome: "Primavera do Leste", uf: "MT", regiao: "Centro-Oeste", pop: 85146, taxa: 4.10 },
+      { nome: "Nova Mutum", uf: "MT", regiao: "Centro-Oeste", pop: 55648, taxa: 4.75 },
+      { nome: "Corumbá", uf: "MS", regiao: "Centro-Oeste", pop: 96261, taxa: -0.52 },
+      { nome: "Ponta Porã", uf: "MS", regiao: "Centro-Oeste", pop: 92017, taxa: 1.32 },
+      { nome: "Cáceres", uf: "MT", regiao: "Centro-Oeste", pop: 89681, taxa: 0.15 },
+      { nome: "Barra do Garças", uf: "MT", regiao: "Centro-Oeste", pop: 69210, taxa: 1.20 },
+      { nome: "Jataí", uf: "GO", regiao: "Centro-Oeste", pop: 105729, taxa: 1.78 },
+      { nome: "Itumbiara", uf: "GO", regiao: "Centro-Oeste", pop: 107970, taxa: 1.12 },
+      { nome: "Catalão", uf: "GO", regiao: "Centro-Oeste", pop: 114427, taxa: 2.10 },
+      { nome: "Anápolis", uf: "GO", regiao: "Centro-Oeste", pop: 398817, taxa: 1.58 },
+      { nome: "Pirenópolis", uf: "GO", regiao: "Centro-Oeste", pop: 26690, taxa: 0.85 },
+      { nome: "Alto Paraíso de Goiás", uf: "GO", regiao: "Centro-Oeste", pop: 10306, taxa: 2.70 },
+      { nome: "Alcinópolis", uf: "MS", regiao: "Centro-Oeste", pop: 4537, taxa: -0.25 },
+      { nome: "Araguainha", uf: "MT", regiao: "Centro-Oeste", pop: 1010, taxa: -0.80 },
+
+      // NORTE (Crescimento demográfico acelerado em polos de mineração, fronteira e capitais jovens)
+      { nome: "Parauapebas", uf: "PA", regiao: "Norte", pop: 267836, taxa: 4.15 },
+      { nome: "Canaã dos Carajás", uf: "PA", regiao: "Norte", pop: 77079, taxa: 6.85 },
+      { nome: "Boa Vista", uf: "RR", regiao: "Norte", pop: 413486, taxa: 3.25 },
+      { nome: "Palmas", uf: "TO", regiao: "Norte", pop: 302692, taxa: 2.45 },
+      { nome: "Manaus", uf: "AM", regiao: "Norte", pop: 2063547, taxa: 1.22 },
+      { nome: "Porto Velho", uf: "RO", regiao: "Norte", pop: 460413, taxa: 0.75 },
+      { nome: "Macapá", uf: "AP", regiao: "Norte", pop: 442933, taxa: 0.95 },
+      { nome: "Rio Branco", uf: "AC", regiao: "Norte", pop: 364756, taxa: 0.82 },
+      { nome: "Santarém", uf: "PA", regiao: "Norte", pop: 331937, taxa: 1.15 },
+      { nome: "Marabá", uf: "PA", regiao: "Norte", pop: 266536, taxa: 1.48 },
+      { nome: "Ananindeua", uf: "PA", regiao: "Norte", pop: 478778, taxa: -0.15 },
+      { nome: "Belém", uf: "PA", regiao: "Norte", pop: 1303389, taxa: -0.65 },
+      { nome: "Castanhal", uf: "PA", regiao: "Norte", pop: 192262, taxa: 1.05 },
+      { nome: "Araguaína", uf: "TO", regiao: "Norte", pop: 171301, taxa: 1.35 },
+      { nome: "Gurupi", uf: "TO", regiao: "Norte", pop: 85126, taxa: 1.10 },
+      { nome: "Ji-Paraná", uf: "RO", regiao: "Norte", pop: 124333, taxa: 0.65 },
+      { nome: "Ariquemes", uf: "RO", regiao: "Norte", pop: 96833, taxa: 0.72 },
+      { nome: "Vilhena", uf: "RO", regiao: "Norte", pop: 95832, taxa: 1.85 },
+      { nome: "Cruzeiro do Sul", uf: "AC", regiao: "Norte", pop: 91888, taxa: 1.15 },
+      { nome: "Santana", uf: "AP", regiao: "Norte", pop: 107618, taxa: 0.60 },
+      { nome: "Itaituba", uf: "PA", regiao: "Norte", pop: 123314, taxa: 1.95 },
+      { nome: "Altamira", uf: "PA", regiao: "Norte", pop: 126279, taxa: 2.10 },
+      { nome: "Tucuruí", uf: "PA", regiao: "Norte", pop: 111508, taxa: 1.25 },
+      { nome: "Parintins", uf: "AM", regiao: "Norte", pop: 96372, taxa: -0.45 },
+      { nome: "Coari", uf: "AM", regiao: "Norte", pop: 70616, taxa: -0.85 },
+      { nome: "Iranduba", uf: "AM", regiao: "Norte", pop: 60993, taxa: 3.40 },
+      { nome: "Pacaraima", uf: "RR", regiao: "Norte", pop: 19305, taxa: 4.80 },
+      { nome: "Porto Grande", uf: "AP", regiao: "Norte", pop: 17848, taxa: 1.55 },
+      { nome: "Rorainópolis", uf: "RR", regiao: "Norte", pop: 32647, taxa: 2.10 },
+      { nome: "Guajará-Mirim", uf: "RO", regiao: "Norte", pop: 39386, taxa: -0.32 },
+
+      // NORDESTE (Transição demográfica acelerada, metrópoles litorâneas desacelerando, polos do interior dinâmicos)
+      { nome: "Salvador", uf: "BA", regiao: "Nordeste", pop: 2418005, taxa: -0.95 },
+      { nome: "Fortaleza", uf: "CE", regiao: "Nordeste", pop: 2428678, taxa: -0.40 },
+      { nome: "Recife", uf: "PE", regiao: "Nordeste", pop: 1488920, taxa: -0.35 },
+      { nome: "São Luís", uf: "MA", regiao: "Nordeste", pop: 1037775, taxa: 0.25 },
+      { nome: "Maceió", uf: "AL", regiao: "Nordeste", pop: 957916, taxa: 0.22 },
+      { nome: "Natal", uf: "RN", regiao: "Nordeste", pop: 751300, taxa: -0.65 },
+      { nome: "Teresina", uf: "PI", regiao: "Nordeste", pop: 866300, taxa: 0.45 },
+      { nome: "João Pessoa", uf: "PB", regiao: "Nordeste", pop: 833932, taxa: 1.35 },
+      { nome: "Aracaju", uf: "SE", regiao: "Nordeste", pop: 602757, taxa: 0.48 },
+      { nome: "Feira de Santana", uf: "BA", regiao: "Nordeste", pop: 616279, taxa: 0.85 },
+      { nome: "Campina Grande", uf: "PB", regiao: "Nordeste", pop: 419379, taxa: 0.82 },
+      { nome: "Caruaru", uf: "PE", regiao: "Nordeste", pop: 378052, taxa: 1.45 },
+      { nome: "Petrolina", uf: "PE", regiao: "Nordeste", pop: 386786, taxa: 2.15 },
+      { nome: "Juazeiro", uf: "BA", regiao: "Nordeste", pop: 235816, taxa: 1.40 },
+      { nome: "Vitória da Conquista", uf: "BA", regiao: "Nordeste", pop: 370868, taxa: 1.65 },
+      { nome: "Juazeiro do Norte", uf: "CE", regiao: "Nordeste", pop: 286120, taxa: 1.10 },
+      { nome: "Sobral", uf: "CE", regiao: "Nordeste", pop: 203062, taxa: 0.75 },
+      { nome: "Mossoró", uf: "RN", regiao: "Nordeste", pop: 264577, taxa: 0.20 },
+      { nome: "Imperatriz", uf: "MA", regiao: "Nordeste", pop: 273110, taxa: 0.95 },
+      { nome: "Parnaíba", uf: "PI", regiao: "Nordeste", pop: 162159, taxa: 0.90 },
+      { nome: "Luís Eduardo Magalhães", uf: "BA", regiao: "Nordeste", pop: 107909, taxa: 4.80 },
+      { nome: "Barreiras", uf: "BA", regiao: "Nordeste", pop: 159743, taxa: 1.55 },
+      { nome: "Balsas", uf: "MA", regiao: "Nordeste", pop: 101767, taxa: 2.10 },
+      { nome: "Paulista", uf: "PE", regiao: "Nordeste", pop: 342167, taxa: 1.15 },
+      { nome: "Nossa Senhora do Socorro", uf: "SE", regiao: "Nordeste", pop: 192330, taxa: 1.70 },
+      { nome: "Caucaia", uf: "CE", regiao: "Nordeste", pop: 355679, taxa: 0.78 },
+      { nome: "Maracanaú", uf: "CE", regiao: "Nordeste", pop: 234523, taxa: 1.05 },
+      { nome: "Arapiraca", uf: "AL", regiao: "Nordeste", pop: 234696, taxa: 0.85 },
+      { nome: "Ilhéus", uf: "BA", regiao: "Nordeste", pop: 178703, taxa: -1.20 },
+      { nome: "Itabuna", uf: "BA", regiao: "Nordeste", pop: 186708, taxa: -0.90 },
+      { nome: "Cabedelo", uf: "PB", regiao: "Nordeste", pop: 66544, taxa: 1.25 },
+      { nome: "Picos", uf: "PI", regiao: "Nordeste", pop: 83090, taxa: 0.80 },
+
+      // SUDESTE (Metrópoles consolidadas desacelerando, polos do interior e litorais em ritmo forte)
+      { nome: "São Paulo", uf: "SP", regiao: "Sudeste", pop: 11451245, taxa: 0.15 },
+      { nome: "Rio de Janeiro", uf: "RJ", regiao: "Sudeste", pop: 6211423, taxa: -0.32 },
+      { nome: "Belo Horizonte", uf: "MG", regiao: "Sudeste", pop: 2315560, taxa: -0.25 },
+      { nome: "Vitória", uf: "ES", regiao: "Sudeste", pop: 322869, taxa: -0.15 },
+      { nome: "Campinas", uf: "SP", regiao: "Sudeste", pop: 1138309, taxa: 0.52 },
+      { nome: "São José dos Campos", uf: "SP", regiao: "Sudeste", pop: 697428, taxa: 0.85 },
+      { nome: "Ribeirão Preto", uf: "SP", regiao: "Sudeste", pop: 698259, taxa: 1.30 },
+      { nome: "Sorocaba", uf: "SP", regiao: "Sudeste", pop: 723574, taxa: 1.65 },
+      { nome: "Paulínia", uf: "SP", regiao: "Sudeste", pop: 110537, taxa: 2.85 },
+      { nome: "Indaiatuba", uf: "SP", regiao: "Sudeste", pop: 255729, taxa: 2.15 },
+      { nome: "Itupeva", uf: "SP", regiao: "Sudeste", pop: 70616, taxa: 3.55 },
+      { nome: "Uberlândia", uf: "MG", regiao: "Sudeste", pop: 713232, taxa: 1.68 },
+      { nome: "Uberaba", uf: "MG", regiao: "Sudeste", pop: 337846, taxa: 1.25 },
+      { nome: "Juiz de Fora", uf: "MG", regiao: "Sudeste", pop: 540756, taxa: 0.45 },
+      { nome: "Montes Claros", uf: "MG", regiao: "Sudeste", pop: 414240, taxa: 1.10 },
+      { nome: "Nova Lima", uf: "MG", regiao: "Sudeste", pop: 111697, taxa: 3.15 },
+      { nome: "Serra", uf: "ES", regiao: "Sudeste", pop: 520653, taxa: 2.10 },
+      { nome: "Vila Velha", uf: "ES", regiao: "Sudeste", pop: 467722, taxa: 1.15 },
+      { nome: "Linhares", uf: "ES", regiao: "Sudeste", pop: 171555, taxa: 1.85 },
+      { nome: "Maricá", uf: "RJ", regiao: "Sudeste", pop: 197300, taxa: 3.90 },
+      { nome: "Macaé", uf: "RJ", regiao: "Sudeste", pop: 246391, taxa: 1.75 },
+      { nome: "Niterói", uf: "RJ", regiao: "Sudeste", pop: 481758, taxa: -0.10 },
+      { nome: "São Gonçalo", uf: "RJ", regiao: "Sudeste", pop: 896744, taxa: -0.85 },
+      { nome: "Duque de Caxias", uf: "RJ", regiao: "Sudeste", pop: 808152, taxa: -0.45 },
+      { nome: "Santos", uf: "SP", regiao: "Sudeste", pop: 418608, taxa: -0.20 },
+      { nome: "Praia Grande", uf: "SP", regiao: "Sudeste", pop: 349935, taxa: 2.65 },
+      { nome: "São Bernardo do Campo", uf: "SP", regiao: "Sudeste", pop: 810729, taxa: 0.55 },
+      { nome: "Santo André", uf: "SP", regiao: "Sudeste", pop: 748919, taxa: 0.42 },
+      { nome: "Osasco", uf: "SP", regiao: "Sudeste", pop: 743432, taxa: 0.95 },
+      { nome: "Piracicaba", uf: "SP", regiao: "Sudeste", pop: 423323, taxa: 1.25 },
+      { nome: "Bauru", uf: "SP", regiao: "Sudeste", pop: 379146, taxa: 0.85 },
+      { nome: "Franca", uf: "SP", regiao: "Sudeste", pop: 352537, taxa: 1.15 },
+
+      // SUL (Transição avançada, fecundidade baixa, forte atração em eixos costeiros de SC e agro do PR)
+      { nome: "Porto Alegre", uf: "RS", regiao: "Sul", pop: 1332570, taxa: -0.55 },
+      { nome: "Curitiba", uf: "PR", regiao: "Sul", pop: 1773733, taxa: 0.25 },
+      { nome: "Florianópolis", uf: "SC", regiao: "Sul", pop: 537213, taxa: 2.25 },
+      { nome: "Joinville", uf: "SC", regiao: "Sul", pop: 616323, taxa: 1.78 },
+      { nome: "Itajaí", uf: "SC", regiao: "Sul", pop: 264054, taxa: 3.20 },
+      { nome: "Balneário Camboriú", uf: "SC", regiao: "Sul", pop: 139155, taxa: 2.85 },
+      { nome: "Palhoça", uf: "SC", regiao: "Sul", pop: 222598, taxa: 4.15 },
+      { nome: "São José", uf: "SC", regiao: "Sul", pop: 270295, taxa: 2.30 },
+      { nome: "Blumenau", uf: "SC", regiao: "Sul", pop: 361261, taxa: 1.45 },
+      { nome: "Chapecó", uf: "SC", regiao: "Sul", pop: 254781, taxa: 2.95 },
+      { nome: "Londrina", uf: "PR", regiao: "Sul", pop: 555965, taxa: 0.95 },
+      { nome: "Maringá", uf: "PR", regiao: "Sul", pop: 409657, taxa: 1.35 },
+      { nome: "Cascavel", uf: "PR", regiao: "Sul", pop: 348051, taxa: 1.85 },
+      { nome: "Ponta Grossa", uf: "PR", regiao: "Sul", pop: 358371, taxa: 1.40 },
+      { nome: "Foz do Iguaçu", uf: "PR", regiao: "Sul", pop: 285415, taxa: 0.75 },
+      { nome: "São José dos Pinhais", uf: "PR", regiao: "Sul", pop: 329222, taxa: 1.85 },
+      { nome: "Fazenda Rio Grande", uf: "PR", regiao: "Sul", pop: 148873, taxa: 4.95 },
+      { nome: "Caxias do Sul", uf: "RS", regiao: "Sul", pop: 463370, taxa: 0.70 },
+      { nome: "Pelotas", uf: "RS", regiao: "Sul", pop: 325689, taxa: -0.15 },
+      { nome: "Canoas", uf: "RS", regiao: "Sul", pop: 347657, taxa: 0.65 },
+      { nome: "Santa Maria", uf: "RS", regiao: "Sul", pop: 271633, taxa: 0.35 },
+      { nome: "Gravataí", uf: "RS", regiao: "Sul", pop: 265070, taxa: 0.85 },
+      { nome: "Novo Hamburgo", uf: "RS", regiao: "Sul", pop: 227732, taxa: -0.30 },
+      { nome: "Passo Fundo", uf: "RS", regiao: "Sul", pop: 206224, taxa: 1.15 },
+      { nome: "Rio Grande", uf: "RS", regiao: "Sul", pop: 191900, taxa: -0.25 },
+      { nome: "Uruguaiana", uf: "RS", regiao: "Sul", pop: 117210, taxa: -0.45 },
+      { nome: "Bento Gonçalves", uf: "RS", regiao: "Sul", pop: 121120, taxa: 1.20 },
+      { nome: "Brusque", uf: "SC", regiao: "Sul", pop: 141385, taxa: 2.70 },
+      { nome: "Toledo", uf: "PR", regiao: "Sul", pop: 150470, taxa: 2.25 },
+      { nome: "Pato Branco", uf: "PR", regiao: "Sul", pop: 91836, taxa: 2.10 }
+    ];
+
+    // Cálculos preliminares para enriquecer os dados com ganho absoluto de habitantes
+    MUNICIPALITIES_DATA.forEach(m => {
+      // Ganho absoluto anual = População * (e^taxa - 1) ou aprox Pop * taxa%
+      m.ganhoAbsoluto = Math.round(m.pop * (m.taxa / 100));
+    });
+
+    // --- 2. FUNÇÕES ESTATÍSTICAS NATIVAS ROBUSTAS ---
+    function calcStats(numbers) {
+      if (!numbers || numbers.length === 0) return { mean: 0, median: 0, std: 0, cv: 0, min: 0, max: 0 };
+      
+      const n = numbers.length;
+      const sum = numbers.reduce((acc, v) => acc + v, 0);
+      const mean = sum / n;
+
+      // Mediana
+      const sorted = [...numbers].sort((a, b) => a - b);
+      const mid = Math.floor(n / 2);
+      const median = (n % 2 !== 0) ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+
+      // Desvio Padrão amostral (ou populacional se n=1)
+      const variance = (n > 1) 
+        ? numbers.reduce((acc, v) => acc + Math.pow(v - mean, 2), 0) / (n - 1)
+        : 0;
+      const std = Math.sqrt(variance);
+
+      // Coeficiente de Variação (CV = std / mean * 100)
+      const cv = (mean !== 0) ? Math.abs((std / mean) * 100) : 0;
+
+      return {
+        mean,
+        median,
+        std,
+        cv,
+        min: sorted[0],
+        max: sorted[sorted.length - 1],
+        p25: sorted[Math.floor(n * 0.25)],
+        p75: sorted[Math.floor(n * 0.75)]
+      };
+    }
+
+    // --- 3. ESTADO DA APLICAÇÃO ---
+    let currentRegion = "ALL";
+    let currentPorte = "ALL";
+    let searchQuery = "";
+    let sortColumn = "taxa_desc";
+    let currentPage = 1;
+    const itemsPerPage = 8;
+
+    // Regiões fixas para comparativo
+    const REGIOES = ["Norte", "Nordeste", "Centro-Oeste", "Sudeste", "Sul"];
+
+    // --- 4. FILTRAGEM DE DADOS ---
+    function getFilteredData() {
+      return MUNICIPALITIES_DATA.filter(m => {
+        // Filtro por região
+        if (currentRegion !== "ALL" && m.regiao !== currentRegion) return false;
+
+        // Filtro por porte
+        if (currentPorte === "PEQUENO" && m.pop >= 20000) return false;
+        if (currentPorte === "MEDIO_PEQ" && (m.pop < 20000 || m.pop >= 50000)) return false;
+        if (currentPorte === "MEDIO" && (m.pop < 50000 || m.pop >= 150000)) return false;
+        if (currentPorte === "GRANDE" && m.pop < 150000) return false;
+
+        // Filtro por busca
+        if (searchQuery.trim() !== "") {
+          const q = searchQuery.toLowerCase();
+          const matchNome = m.nome.toLowerCase().includes(q);
+          const matchUF = m.uf.toLowerCase().includes(q);
+          if (!matchNome && !matchUF) return false;
+        }
+
+        return true;
+      });
+    }
+
+    // --- 5. RENDERIZAÇÃO DE KPIS ---
+    function updateKPIs(filtered) {
+      const taxas = filtered.map(m => m.taxa);
+      const stats = calcStats(taxas);
+      
+      const totalPop = filtered.reduce((acc, m) => acc + m.pop, 0);
+      const totalGanho = filtered.reduce((acc, m) => acc + m.ganhoAbsoluto, 0);
+      
+      const declinioCount = filtered.filter(m => m.taxa < 0).length;
+      const boomCount = filtered.filter(m => m.taxa > 2.0).length;
+
+      // Elementos do DOM
+      document.getElementById('kpiMedia').textContent = (stats.mean >= 0 ? "+" : "") + stats.mean.toFixed(2) + "%";
+      document.getElementById('kpiMediana').textContent = (stats.median >= 0 ? "+" : "") + stats.median.toFixed(2) + "%";
+      document.getElementById('kpiDesvio').textContent = stats.std.toFixed(2) + "%";
+      document.getElementById('kpiCV').textContent = stats.cv.toFixed(0) + "%";
+      
+      const signAbs = totalGanho >= 0 ? "+" : "";
+      document.getElementById('kpiAbsoluto').textContent = signAbs + totalGanho.toLocaleString('pt-BR');
+      document.getElementById('kpiPopBase').textContent = (totalPop / 1000000).toFixed(1) + "M hab";
+
+      // Interpretação de Assimetria
+      const delta = stats.mean - stats.median;
+      const titAssimetria = document.getElementById('kpiAssimetriaTitulo');
+      const descAssimetria = document.getElementById('kpiAssimetriaDesc');
+
+      if (delta > 0.15) {
+        titAssimetria.textContent = "Assimetria Positiva";
+        titAssimetria.className = "text-base font-bold text-amber-400 block leading-tight";
+        descAssimetria.textContent = `Média (+${delta.toFixed(2)} p.p.) > Mediana. Polos puxam o ritmo.`;
+      } else if (delta < -0.15) {
+        titAssimetria.textContent = "Assimetria Negativa";
+        titAssimetria.className = "text-base font-bold text-rose-400 block leading-tight";
+        descAssimetria.textContent = `Média < Mediana. Cidades em esvaziamento puxam para baixo.`;
+      } else {
+        titAssimetria.textContent = "Distribuição Quase Simétrica";
+        titAssimetria.className = "text-base font-bold text-emerald-400 block leading-tight";
+        descAssimetria.textContent = `Média ≈ Mediana. Ritmo homogêneo no grupo.`;
+      }
+
+      document.getElementById('kpiDeclinioCount').textContent = `${declinioCount} em declínio (<0%)`;
+      document.getElementById('kpiBoomCount').textContent = `${boomCount} em boom (>2%)`;
+
+      // Atualiza Simulador
+      updateSimulador(stats.mean, stats.median);
+    }
+
+    // --- 6. GRÁFICO 1: COMPARATIVO REGIONAL EM SVG PURO ---
+    function renderRegionalBarsChart() {
+      const svg = document.getElementById('svgRegionalBars');
+      const tooltip = document.getElementById('tooltipRegional');
+      svg.innerHTML = '';
+
+      // Calcula estatísticas para cada uma das 5 regiões
+      const regionalStats = REGIOES.map(reg => {
+        const dataReg = MUNICIPALITIES_DATA.filter(m => m.regiao === reg);
+        const stats = calcStats(dataReg.map(m => m.taxa));
+        const totalGanho = dataReg.reduce((acc, m) => acc + m.ganhoAbsoluto, 0);
+        return {
+          regiao: reg,
+          count: dataReg.length,
+          stats,
+          totalGanho
+        };
+      });
+
+      // Configuração de dimensões no SVG viewBox 650x320
+      const padding = { top: 35, right: 30, bottom: 50, left: 55 };
+      const width = 650 - padding.left - padding.right;
+      const height = 320 - padding.top - padding.bottom;
+
+      // Escala Y (-1.5% a +5.0%)
+      const minY = -1.5;
+      const maxY = 5.0;
+      const scaleY = (val) => {
+        return padding.top + height - ((val - minY) / (maxY - minY)) * height;
+      };
+
+      const yZero = scaleY(0);
+
+      // Linhas de Grade e Eixo Y
+      const gridSteps = [-1.0, 0, 1.0, 2.0, 3.0, 4.0, 5.0];
+      gridSteps.forEach(val => {
+        const y = scaleY(val);
+        const isZero = val === 0;
+
+        // Linha
+        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        line.setAttribute('x1', padding.left);
+        line.setAttribute('y1', y);
+        line.setAttribute('x2', padding.left + width);
+        line.setAttribute('y2', y);
+        line.setAttribute('stroke', isZero ? '#64748b' : '#334155');
+        line.setAttribute('stroke-width', isZero ? '1.5' : '1');
+        line.setAttribute('stroke-dasharray', isZero ? 'none' : '3,3');
+        svg.appendChild(line);
+
+        // Texto do Eixo Y
+        const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        text.setAttribute('x', padding.left - 8);
+        text.setAttribute('y', y + 4);
+        text.setAttribute('text-anchor', 'end');
+        text.setAttribute('fill', isZero ? '#e2e8f0' : '#94a3b8');
+        text.setAttribute('font-size', '11');
+        text.textContent = (val > 0 ? "+" : "") + val.toFixed(1) + "%";
+        svg.appendChild(text);
+      });
+
+      // Renderiza cada Região
+      const colWidth = width / regionalStats.length;
+      const barWidth = 22;
+      const barGap = 6;
+
+      regionalStats.forEach((item, idx) => {
+        const groupX = padding.left + idx * colWidth + (colWidth / 2);
+        const isSelected = (currentRegion === item.regiao || currentRegion === "ALL");
+        const opacity = isSelected ? "1" : "0.35";
+
+        // Coordenadas das Barras
+        const meanY = scaleY(item.stats.mean);
+        const medianY = scaleY(item.stats.median);
+
+        const xMean = groupX - barWidth - (barGap / 2);
+        const xMedian = groupX + (barGap / 2);
+
+        // Barra da Média (Azul)
+        const rectMean = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        const hMean = Math.abs(yZero - meanY);
+        rectMean.setAttribute('x', xMean);
+        rectMean.setAttribute('y', Math.min(yZero, meanY));
+        rectMean.setAttribute('width', barWidth);
+        rectMean.setAttribute('height', Math.max(hMean, 2));
+        rectMean.setAttribute('rx', '3');
+        rectMean.setAttribute('fill', '#3b82f6');
+        rectMean.setAttribute('opacity', opacity);
+        rectMean.classList.add('transition-all', 'duration-200', 'cursor-pointer');
+        svg.appendChild(rectMean);
+
+        // Barra da Mediana (Verde Esmeralda)
+        const rectMedian = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        const hMedian = Math.abs(yZero - medianY);
+        rectMedian.setAttribute('x', xMedian);
+        rectMedian.setAttribute('y', Math.min(yZero, medianY));
+        rectMedian.setAttribute('width', barWidth);
+        rectMedian.setAttribute('height', Math.max(hMedian, 2));
+        rectMedian.setAttribute('rx', '3');
+        rectMedian.setAttribute('fill', '#10b981');
+        rectMedian.setAttribute('opacity', opacity);
+        rectMedian.classList.add('transition-all', 'duration-200', 'cursor-pointer');
+        svg.appendChild(rectMedian);
+
+        // Barra de Erro: Desvio Padrão (+-1 sigma a partir da média)
+        const yPlusSigma = scaleY(Math.min(item.stats.mean + item.stats.std, maxY));
+        const yMinusSigma = scaleY(Math.max(item.stats.mean - item.stats.std, minY));
+
+        const errLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        errLine.setAttribute('x1', xMean + barWidth / 2);
+        errLine.setAttribute('y1', yPlusSigma);
+        errLine.setAttribute('x2', xMean + barWidth / 2);
+        errLine.setAttribute('y2', yMinusSigma);
+        errLine.setAttribute('stroke', '#f43f5e');
+        errLine.setAttribute('stroke-width', '2');
+        errLine.setAttribute('opacity', opacity);
+        svg.appendChild(errLine);
+
+        // Marcadores nos topos do desvio padrão
+        [-1, 1].forEach(dir => {
+          const yTip = dir === 1 ? yPlusSigma : yMinusSigma;
+          const tip = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+          tip.setAttribute('x1', (xMean + barWidth / 2) - 5);
+          tip.setAttribute('y1', yTip);
+          tip.setAttribute('x2', (xMean + barWidth / 2) + 5);
+          tip.setAttribute('y2', yTip);
+          tip.setAttribute('stroke', '#f43f5e');
+          tip.setAttribute('stroke-width', '2');
+          tip.setAttribute('opacity', opacity);
+          svg.appendChild(tip);
+        });
+
+        // Nome da Região no Eixo X
+        const labelText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        labelText.setAttribute('x', groupX);
+        labelText.setAttribute('y', padding.top + height + 22);
+        labelText.setAttribute('text-anchor', 'middle');
+        labelText.setAttribute('fill', currentRegion === item.regiao ? '#38bdf8' : '#e2e8f0');
+        labelText.setAttribute('font-weight', currentRegion === item.regiao ? 'bold' : 'normal');
+        labelText.setAttribute('font-size', '12');
+        labelText.textContent = item.regiao;
+        labelText.classList.add('cursor-pointer');
+        labelText.onclick = () => setRegionFilter(item.regiao);
+        svg.appendChild(labelText);
+
+        // Subtítulo do Eixo X (Desvio Padrão numérico)
+        const subLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        subLabel.setAttribute('x', groupX);
+        subLabel.setAttribute('y', padding.top + height + 36);
+        subLabel.setAttribute('text-anchor', 'middle');
+        subLabel.setAttribute('fill', '#94a3b8');
+        subLabel.setAttribute('font-size', '10');
+        subLabel.textContent = `\u03C3 = ${item.stats.std.toFixed(2)}%`;
+        svg.appendChild(subLabel);
+
+        // Interação de Hover / Tooltip
+        const triggerArea = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        triggerArea.setAttribute('x', groupX - colWidth / 2 + 5);
+        triggerArea.setAttribute('y', padding.top);
+        triggerArea.setAttribute('width', colWidth - 10);
+        triggerArea.setAttribute('height', height + 40);
+        triggerArea.setAttribute('fill', 'transparent');
+        triggerArea.classList.add('cursor-pointer');
+
+        triggerArea.onmousemove = (e) => {
+          tooltip.classList.remove('hidden');
+          const delta = item.stats.mean - item.stats.median;
+          tooltip.innerHTML = `
+            <div class="font-bold text-white border-b border-slate-700 pb-1 mb-1.5 flex justify-between gap-4">
+              <span>${item.regiao}</span>
+              <span class="text-slate-400 font-normal">${item.count} municípios</span>
+            </div>
+            <div class="space-y-1">
+              <div class="flex justify-between gap-4 text-blue-400">
+                <span>Média:</span> <strong>+${item.stats.mean.toFixed(2)}% a.a.</strong>
+              </div>
+              <div class="flex justify-between gap-4 text-emerald-400">
+                <span>Mediana:</span> <strong>+${item.stats.median.toFixed(2)}% a.a.</strong>
+              </div>
+              <div class="flex justify-between gap-4 text-purple-400">
+                <span>Desvio Padrão (\u03C3):</span> <strong>${item.stats.std.toFixed(2)} p.p.</strong>
+              </div>
+              <div class="flex justify-between gap-4 text-amber-400">
+                <span>Coef. Variação (CV):</span> <strong>${item.stats.cv.toFixed(0)}%</strong>
+              </div>
+              <div class="flex justify-between gap-4 text-slate-300 pt-1 border-t border-slate-800">
+                <span>Diferença (\u03BC - Md):</span> 
+                <strong class="${delta > 0 ? 'text-amber-300' : 'text-slate-300'}">${delta > 0 ? '+' : ''}${delta.toFixed(2)} p.p.</strong>
+              </div>
+            </div>
+          `;
+          const rect = svg.getBoundingClientRect();
+          tooltip.style.left = `${e.clientX - rect.left + 15}px`;
+          tooltip.style.top = `${e.clientY - rect.top - 10}px`;
+        };
+
+        triggerArea.onmouseleave = () => {
+          tooltip.classList.add('hidden');
+        };
+
+        triggerArea.onclick = () => {
+          setRegionFilter(currentRegion === item.regiao ? "ALL" : item.regiao);
+        };
+
+        svg.appendChild(triggerArea);
+      });
+    }
+
+    // --- 7. GRÁFICO 2: HISTOGRAMA DE FREQUÊNCIA & DENSIDADE (SVG) ---
+    function renderDistributionChart(filtered) {
+      const svg = document.getElementById('svgDistribution');
+      const tooltip = document.getElementById('tooltipDist');
+      svg.innerHTML = '';
+
+      document.getElementById('distSampleSize').textContent = filtered.length;
+
+      if (filtered.length === 0) {
+        const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        text.setAttribute('x', '225');
+        text.setAttribute('y', '160');
+        text.setAttribute('text-anchor', 'middle');
+        text.setAttribute('fill', '#64748b');
+        text.textContent = 'Nenhum município correspondente';
+        svg.appendChild(text);
+        return;
+      }
+
+      const taxas = filtered.map(m => m.taxa);
+      const stats = calcStats(taxas);
+
+      // Define faixas (bins) de -1.5% até 5.5% em intervalos de 0.5%
+      const binSize = 0.6;
+      const minBin = -1.5;
+      const maxBin = 5.5;
+      const numBins = Math.ceil((maxBin - minBin) / binSize);
+      const bins = Array(numBins).fill(0).map((_, i) => ({
+        x0: minBin + i * binSize,
+        x1: minBin + (i + 1) * binSize,
+        count: 0,
+        names: []
+      }));
+
+      filtered.forEach(m => {
+        let placed = false;
+        for (let b of bins) {
+          if (m.taxa >= b.x0 && m.taxa < b.x1) {
+            b.count++;
+            b.names.push(m.nome);
+            placed = true;
+            break;
+          }
+        }
+        if (!placed && m.taxa >= maxBin) {
+          bins[bins.length - 1].count++;
+          bins[bins.length - 1].names.push(m.nome);
+        }
+      });
+
+      const maxCount = Math.max(...bins.map(b => b.count), 1);
+
+      // Geometria viewBox 450x320
+      const padding = { top: 30, right: 25, bottom: 45, left: 40 };
+      const width = 450 - padding.left - padding.right;
+      const height = 320 - padding.top - padding.bottom;
+
+      const scaleX = (val) => padding.left + ((val - minBin) / (maxBin - minBin)) * width;
+      const scaleY = (cnt) => padding.top + height - (cnt / maxCount) * height;
+
+      // Eixo X e Linhas de grade
+      for (let v = -1; v <= 5; v += 1) {
+        const x = scaleX(v);
+        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        line.setAttribute('x1', x);
+        line.setAttribute('y1', padding.top);
+        line.setAttribute('x2', x);
+        line.setAttribute('y2', padding.top + height);
+        line.setAttribute('stroke', v === 0 ? '#64748b' : '#1e293b');
+        line.setAttribute('stroke-dasharray', v === 0 ? 'none' : '3,3');
+        svg.appendChild(line);
+
+        const lbl = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        lbl.setAttribute('x', x);
+        lbl.setAttribute('y', padding.top + height + 18);
+        lbl.setAttribute('text-anchor', 'middle');
+        lbl.setAttribute('fill', v === 0 ? '#f8fafc' : '#94a3b8');
+        lbl.setAttribute('font-size', '10');
+        lbl.textContent = (v > 0 ? "+" : "") + v + "%";
+        svg.appendChild(lbl);
+      }
+
+      // Renderiza as Barras do Histograma
+      bins.forEach(b => {
+        if (b.count === 0) return;
+        const xStart = scaleX(b.x0);
+        const xEnd = scaleX(b.x1);
+        const barW = Math.max(xEnd - xStart - 2, 2);
+        const y = scaleY(b.count);
+        const h = padding.top + height - y;
+
+        const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        rect.setAttribute('x', xStart + 1);
+        rect.setAttribute('y', y);
+        rect.setAttribute('width', barW);
+        rect.setAttribute('height', h);
+        rect.setAttribute('rx', '3');
+        rect.setAttribute('fill', b.x0 < 0 ? '#f43f5e' : '#8b5cf6');
+        rect.setAttribute('opacity', '0.85');
+        rect.classList.add('transition-all', 'duration-150', 'hover:opacity-100', 'cursor-pointer');
+
+        rect.onmousemove = (e) => {
+          tooltip.classList.remove('hidden');
+          const sample = b.names.slice(0, 3).join(', ') + (b.names.length > 3 ? ` e mais ${b.names.length - 3}...` : '');
+          tooltip.innerHTML = `
+            <div class="font-bold text-white border-b border-slate-700 pb-1 mb-1">
+              Faixa: ${b.x0.toFixed(1)}% a ${b.x1.toFixed(1)}% a.a.
+            </div>
+            <div class="text-purple-300 font-semibold mb-1">${b.count} municípios (${((b.count / filtered.length) * 100).toFixed(1)}%)</div>
+            <div class="text-slate-400 text-[10px] leading-tight">Exemplos: ${sample}</div>
+          `;
+          const containerRect = svg.getBoundingClientRect();
+          tooltip.style.left = `${e.clientX - containerRect.left + 15}px`;
+          tooltip.style.top = `${e.clientY - containerRect.top - 15}px`;
+        };
+
+        rect.onmouseleave = () => tooltip.classList.add('hidden');
+        svg.appendChild(rect);
+      });
+
+      // Linha Vertical da Mediana
+      const medX = scaleX(stats.median);
+      const lineMed = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      lineMed.setAttribute('x1', medX);
+      lineMed.setAttribute('y1', padding.top - 5);
+      lineMed.setAttribute('x2', medX);
+      lineMed.setAttribute('y2', padding.top + height);
+      lineMed.setAttribute('stroke', '#10b981');
+      lineMed.setAttribute('stroke-width', '2.5');
+      lineMed.setAttribute('stroke-dasharray', '4,2');
+      svg.appendChild(lineMed);
+
+      // Linha Vertical da Média
+      const meanX = scaleX(stats.mean);
+      const lineMean = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      lineMean.setAttribute('x1', meanX);
+      lineMean.setAttribute('y1', padding.top - 5);
+      lineMean.setAttribute('x2', meanX);
+      lineMean.setAttribute('y2', padding.top + height);
+      lineMean.setAttribute('stroke', '#38bdf8');
+      lineMean.setAttribute('stroke-width', '2.5');
+      svg.appendChild(lineMean);
+    }
+
+    // --- 8. GRÁFICO 3: QUADRANTES DE EXPANSÃO (SCATTER PLOT) ---
+    function renderScatterPlot(filtered) {
+      const svg = document.getElementById('svgScatter');
+      const tooltip = document.getElementById('tooltipScatter');
+      svg.innerHTML = '';
+
+      if (filtered.length === 0) return;
+
+      const padding = { top: 30, right: 35, bottom: 45, left: 65 };
+      const width = 650 - padding.left - padding.right;
+      const height = 360 - padding.top - padding.bottom;
+
+      // Eixo X: Taxa Anual (-1.5% a 6.0%)
+      const minX = -1.5;
+      const maxX = 6.0;
+      const scaleX = (val) => padding.left + ((val - minX) / (maxX - minX)) * width;
+
+      // Eixo Y: Ganho Absoluto (-15.000 a +45.000 hab/ano, com escala ajustável)
+      const maxGanho = Math.max(30000, ...filtered.map(m => m.ganhoAbsoluto));
+      const minGanho = Math.min(-5000, ...filtered.map(m => m.ganhoAbsoluto));
+      const scaleY = (val) => padding.top + height - ((val - minGanho) / (maxGanho - minGanho)) * height;
+
+      const xZero = scaleX(0);
+      const yZero = scaleY(0);
+
+      // Linhas dos Eixos Zero (Origem)
+      const lineY0 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      lineY0.setAttribute('x1', padding.left);
+      lineY0.setAttribute('y1', yZero);
+      lineY0.setAttribute('x2', padding.left + width);
+      lineY0.setAttribute('y2', yZero);
+      lineY0.setAttribute('stroke', '#475569');
+      lineY0.setAttribute('stroke-width', '1.5');
+      svg.appendChild(lineY0);
+
+      const lineX0 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      lineX0.setAttribute('x1', xZero);
+      lineX0.setAttribute('y1', padding.top);
+      lineX0.setAttribute('x2', xZero);
+      lineX0.setAttribute('y2', padding.top + height);
+      lineX0.setAttribute('stroke', '#475569');
+      lineX0.setAttribute('stroke-width', '1.5');
+      svg.appendChild(lineX0);
+
+      // Linhas de Grade de Apoio
+      [-1, 1, 2, 3, 4, 5].forEach(v => {
+        const x = scaleX(v);
+        const l = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        l.setAttribute('x1', x);
+        l.setAttribute('y1', padding.top);
+        l.setAttribute('x2', x);
+        l.setAttribute('y2', padding.top + height);
+        l.setAttribute('stroke', '#1e293b');
+        l.setAttribute('stroke-dasharray', '3,3');
+        svg.appendChild(l);
+
+        const lbl = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        lbl.setAttribute('x', x);
+        lbl.setAttribute('y', padding.top + height + 16);
+        lbl.setAttribute('text-anchor', 'middle');
+        lbl.setAttribute('fill', '#94a3b8');
+        lbl.setAttribute('font-size', '10');
+        lbl.textContent = (v > 0 ? "+" : "") + v + "%";
+        svg.appendChild(lbl);
+      });
+
+      // Eixo Y ticks
+      [0, Math.round(maxGanho * 0.33), Math.round(maxGanho * 0.66), maxGanho].forEach(g => {
+        const y = scaleY(g);
+        const lbl = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        lbl.setAttribute('x', padding.left - 8);
+        lbl.setAttribute('y', y + 3);
+        lbl.setAttribute('text-anchor', 'end');
+        lbl.setAttribute('fill', '#94a3b8');
+        lbl.setAttribute('font-size', '10');
+        lbl.textContent = (g >= 1000 ? (g / 1000).toFixed(0) + "k" : g);
+        svg.appendChild(lbl);
+      });
+
+      // Renderiza os Círculos dos Municípios
+      filtered.forEach(m => {
+        const cx = scaleX(m.taxa);
+        const cy = scaleY(m.ganhoAbsoluto);
+
+        // Raio proporcional à raiz quadrada da população para balanço visual
+        const r = Math.max(3.5, Math.min(18, Math.sqrt(m.pop) / 60));
+
+        // Cor por região
+        let color = '#38bdf8';
+        if (m.regiao === 'Norte') color = '#22c55e';
+        if (m.regiao === 'Nordeste') color = '#f59e0b';
+        if (m.regiao === 'Centro-Oeste') color = '#a855f7';
+        if (m.regiao === 'Sul') color = '#3b82f6';
+        if (m.regiao === 'Sudeste') color = '#ec4899';
+
+        const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        circle.setAttribute('cx', cx);
+        circle.setAttribute('cy', cy);
+        circle.setAttribute('r', r);
+        circle.setAttribute('fill', color);
+        circle.setAttribute('fill-opacity', '0.7');
+        circle.setAttribute('stroke', '#ffffff');
+        circle.setAttribute('stroke-width', '1');
+        circle.setAttribute('stroke-opacity', '0.8');
+        circle.classList.add('transition-transform', 'duration-150', 'hover:scale-125', 'cursor-pointer');
+
+        circle.onmousemove = (e) => {
+          tooltip.classList.remove('hidden');
+          tooltip.innerHTML = `
+            <div class="font-bold text-white border-b border-slate-700 pb-1 mb-1">
+              ${m.nome} - ${m.uf}
+            </div>
+            <div class="text-slate-300 text-[11px] space-y-0.5">
+              <div>Região: <strong class="text-white">${m.regiao}</strong></div>
+              <div>População: <strong class="text-white">${m.pop.toLocaleString('pt-BR')} hab</strong></div>
+              <div>Ritmo Anual: <strong class="${m.taxa >= 0 ? 'text-emerald-400' : 'text-rose-400'}">${m.taxa > 0 ? '+' : ''}${m.taxa.toFixed(2)}% a.a.</strong></div>
+              <div>Ganho Absoluto: <strong class="text-amber-400">${m.ganhoAbsoluto > 0 ? '+' : ''}${m.ganhoAbsoluto.toLocaleString('pt-BR')} hab/ano</strong></div>
+            </div>
+          `;
+          const containerRect = svg.getBoundingClientRect();
+          tooltip.style.left = `${e.clientX - containerRect.left + 15}px`;
+          tooltip.style.top = `${e.clientY - containerRect.top - 15}px`;
+        };
+
+        circle.onmouseleave = () => tooltip.classList.add('hidden');
+        svg.appendChild(circle);
+
+        // Se for cidade representativa ou outlier extremo, adiciona label de texto
+        if (m.taxa > 4.5 || m.ganhoAbsoluto > 15000 || m.taxa < -0.8) {
+          const txt = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+          txt.setAttribute('x', cx + r + 3);
+          txt.setAttribute('y', cy + 3);
+          txt.setAttribute('fill', '#e2e8f0');
+          txt.setAttribute('font-size', '9');
+          txt.setAttribute('font-weight', 'bold');
+          txt.textContent = m.nome;
+          svg.appendChild(txt);
+        }
+      });
+    }
+
+    // --- 9. TABELA DINÂMICA DE DADOS ---
+    function renderTable(filtered) {
+      const tbody = document.getElementById('tableBody');
+      const filteredCountEl = document.getElementById('tableFilteredCount');
+      filteredCountEl.textContent = filtered.length;
+
+      // Ordenação
+      let sorted = [...filtered];
+      if (sortColumn === "taxa_desc") sorted.sort((a, b) => b.taxa - a.taxa);
+      if (sortColumn === "taxa_asc") sorted.sort((a, b) => a.taxa - b.taxa);
+      if (sortColumn === "abs_desc") sorted.sort((a, b) => b.ganhoAbsoluto - a.ganhoAbsoluto);
+      if (sortColumn === "pop_desc") sorted.sort((a, b) => b.pop - a.pop);
+      if (sortColumn === "nome_asc") sorted.sort((a, b) => a.nome.localeCompare(b.nome));
+
+      // Médias regionais para calcular o desvio relativo
+      const statsPorRegiao = {};
+      REGIOES.forEach(r => {
+        const regs = MUNICIPALITIES_DATA.filter(m => m.regiao === r);
+        statsPorRegiao[r] = calcStats(regs.map(m => m.taxa)).mean;
+      });
+
+      // Paginação
+      const totalPages = Math.ceil(sorted.length / itemsPerPage) || 1;
+      if (currentPage > totalPages) currentPage = totalPages;
+
+      const startIdx = (currentPage - 1) * itemsPerPage;
+      const pageItems = sorted.slice(startIdx, startIdx + itemsPerPage);
+
+      tbody.innerHTML = '';
+
+      if (pageItems.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" class="py-6 text-center text-slate-500">Nenhum município atende aos critérios filtrados.</td></tr>`;
+        return;
+      }
+
+      pageItems.forEach(m => {
+        const mediaReg = statsPorRegiao[m.regiao] || 0;
+        const diffMedia = m.taxa - mediaReg;
+
+        // Classificação
+        let statusBadge = '';
+        if (m.taxa < 0) {
+          statusBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] bg-rose-500/10 text-rose-400 border border-rose-500/20">Declínio Populacional</span>`;
+        } else if (m.taxa < 0.8) {
+          statusBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] bg-slate-700 text-slate-300">Crescimento Lento</span>`;
+        } else if (m.taxa < 2.0) {
+          statusBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] bg-blue-500/10 text-blue-400 border border-blue-500/20">Expansão Estável</span>`;
+        } else if (m.taxa < 3.5) {
+          statusBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Crescimento Rápido</span>`;
+        } else {
+          statusBadge = `<span class="px-2 py-0.5 rounded-full text-[10px] bg-purple-500/10 text-purple-300 border border-purple-500/20 font-bold">Boom Demográfico</span>`;
+        }
+
+        const tr = document.createElement('tr');
+        tr.className = "hover:bg-slate-800/40 transition";
+        tr.innerHTML = `
+          <td class="py-2.5 px-3.5">
+            <div class="font-semibold text-white">${m.nome}</div>
+            <div class="text-[10px] text-slate-400">${m.uf} &bull; Brasil</div>
+          </td>
+          <td class="py-2.5 px-3">
+            <span class="inline-block px-1.5 py-0.5 rounded text-[11px] bg-slate-800 text-slate-300 border border-slate-700/60">${m.regiao}</span>
+          </td>
+          <td class="py-2.5 px-3 text-right font-mono">${m.pop.toLocaleString('pt-BR')}</td>
+          <td class="py-2.5 px-3 text-right font-mono font-bold ${m.taxa >= 0 ? 'text-emerald-400' : 'text-rose-400'}">
+            ${m.taxa > 0 ? '+' : ''}${m.taxa.toFixed(2)}%
+          </td>
+          <td class="py-2.5 px-3 text-right font-mono ${m.ganhoAbsoluto >= 0 ? 'text-amber-300' : 'text-rose-400'}">
+            ${m.ganhoAbsoluto > 0 ? '+' : ''}${m.ganhoAbsoluto.toLocaleString('pt-BR')}
+          </td>
+          <td class="py-2.5 px-3 text-right font-mono text-[11px] ${diffMedia >= 0 ? 'text-emerald-400' : 'text-slate-400'}">
+            ${diffMedia >= 0 ? '+' : ''}${diffMedia.toFixed(2)} p.p.
+          </td>
+          <td class="py-2.5 px-3.5 text-center">${statusBadge}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      // Info da paginação
+      document.getElementById('tablePaginationInfo').textContent = `Exibindo página ${currentPage} de ${totalPages} (${sorted.length} registros)`;
+      document.getElementById('btnPrevPage').disabled = (currentPage <= 1);
+      document.getElementById('btnNextPage').disabled = (currentPage >= totalPages);
+    }
+
+    // --- 10. SIMULADOR PROJETIVO ---
+    function updateSimulador(media, mediana) {
+      const popIni = parseFloat(document.getElementById('simPopInicial').value) || 50000;
+      const anos = parseInt(document.getElementById('simAnos').value) || 10;
+
+      document.getElementById('simTaxaMediana').textContent = (mediana >= 0 ? '+' : '') + mediana.toFixed(2) + '%';
+      document.getElementById('simTaxaMedia').textContent = (media >= 0 ? '+' : '') + media.toFixed(2) + '%';
+
+      // Projeção: Pop * (1 + r)^t
+      const rMediana = mediana / 100;
+      const rMedia = media / 100;
+
+      const popFinalMediana = Math.round(popIni * Math.pow(1 + rMediana, anos));
+      const popFinalMedia = Math.round(popIni * Math.pow(1 + rMedia, anos));
+
+      const ganhoMediana = popFinalMediana - popIni;
+      const ganhoMedia = popFinalMedia - popIni;
+      const delta = popFinalMedia - popFinalMediana;
+
+      document.getElementById('simResultMediana').textContent = popFinalMediana.toLocaleString('pt-BR') + ' hab';
+      document.getElementById('simGanhoMediana').textContent = (ganhoMediana >= 0 ? '+' : '') + ganhoMediana.toLocaleString('pt-BR') + ' hab no período';
+
+      document.getElementById('simResultMedia').textContent = popFinalMedia.toLocaleString('pt-BR') + ' hab';
+      document.getElementById('simGanhoMedia').textContent = (ganhoMedia >= 0 ? '+' : '') + ganhoMedia.toLocaleString('pt-BR') + ' hab no período';
+
+      document.getElementById('simDelta').textContent = (delta >= 0 ? '+' : '') + delta.toLocaleString('pt-BR') + ' hab';
+      document.getElementById('simDeltaDesc').textContent = delta > 0 
+        ? `A média sobre-projeta em ${((delta / popFinalMediana) * 100).toFixed(1)}% devido a polos atípicos`
+        : 'Projeções convergentes';
+    }
+
+    // --- 11. CONTROLE DE EVENTOS & FILTROS ---
+    function setRegionFilter(region) {
+      currentRegion = region;
+      document.querySelectorAll('.filter-reg-btn').forEach(btn => {
+        if (btn.getAttribute('data-region') === region) {
+          btn.className = "filter-reg-btn text-xs px-3.5 py-1.5 rounded-lg font-medium transition bg-blue-600 text-white shadow-sm";
+        } else {
+          btn.className = "filter-reg-btn text-xs px-3.5 py-1.5 rounded-lg font-medium transition bg-slate-800 text-slate-300 hover:bg-slate-700";
+        }
+      });
+      document.getElementById('interpretRegionName').textContent = region === "ALL" ? "Todas as Regiões" : region;
+      currentPage = 1;
+      refreshAll();
+    }
+
+    function refreshAll() {
+      const filtered = getFilteredData();
+      updateKPIs(filtered);
+      renderRegionalBarsChart();
+      renderDistributionChart(filtered);
+      renderScatterPlot(filtered);
+      renderTable(filtered);
+    }
+
+    // Inicialização dos Listeners
+    document.querySelectorAll('.filter-reg-btn').forEach(btn => {
+      btn.addEventListener('click', () => setRegionFilter(btn.getAttribute('data-region')));
+    });
+
+    document.getElementById('selectPorte').addEventListener('change', (e) => {
+      currentPorte = e.target.value;
+      currentPage = 1;
+      refreshAll();
+    });
+
+    document.getElementById('inputSearch').addEventListener('input', (e) => {
+      searchQuery = e.target.value;
+      currentPage = 1;
+      refreshAll();
+    });
+
+    document.getElementById('selectSort').addEventListener('change', (e) => {
+      sortColumn = e.target.value;
+      renderTable(getFilteredData());
+    });
+
+    document.getElementById('btnPrevPage').addEventListener('click', () => {
+      if (currentPage > 1) {
+        currentPage--;
+        renderTable(getFilteredData());
+      }
+    });
+
+    document.getElementById('btnNextPage').addEventListener('click', () => {
+      currentPage++;
+      renderTable(getFilteredData());
+    });
+
+    document.getElementById('btnResetFilters').addEventListener('click', () => {
+      currentRegion = "ALL";
+      currentPorte = "ALL";
+      searchQuery = "";
+      sortColumn = "taxa_desc";
+      currentPage = 1;
+      document.getElementById('selectPorte').value = "ALL";
+      document.getElementById('inputSearch').value = "";
+      document.getElementById('selectSort').value = "taxa_desc";
+      setRegionFilter("ALL");
+    });
+
+    document.getElementById('simPopInicial').addEventListener('input', () => {
+      const filtered = getFilteredData();
+      const stats = calcStats(filtered.map(m => m.taxa));
+      updateSimulador(stats.mean, stats.median);
+    });
+
+    document.getElementById('simAnos').addEventListener('change', () => {
+      const filtered = getFilteredData();
+      const stats = calcStats(filtered.map(m => m.taxa));
+      updateSimulador(stats.mean, stats.median);
+    });
+
+    document.getElementById('btnToggleSimulador').addEventListener('click', () => {
+      const simSec = document.getElementById('sectionSimulador');
+      simSec.scrollIntoView({ behavior: 'smooth' });
+    });
+
+    // Iniciar Dashboard
+    window.addEventListener('DOMContentLoaded', () => {
+      refreshAll();
+    });
+  </script>
+</body>
+</html>
